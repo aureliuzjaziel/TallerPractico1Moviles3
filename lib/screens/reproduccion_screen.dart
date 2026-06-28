@@ -1,164 +1,243 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
+import 'package:video_player/video_player.dart';
 
-class ReproduccionScreen extends StatelessWidget {
+class ReproduccionScreen extends StatefulWidget {
   const ReproduccionScreen({super.key});
 
   @override
+  State<ReproduccionScreen> createState() => _ReproduccionScreenState();
+}
+
+class _ReproduccionScreenState extends State<ReproduccionScreen> {
+  VideoPlayerController? _videoController;
+  Future<void>? _initializeVideoPlayerFuture;
+  Map<String, dynamic>? _pelicula;
+
+  bool get _isUserLoggedIn => Supabase.instance.client.auth.currentUser != null;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_pelicula != null) return;
+
+    _pelicula = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    if (_isUserLoggedIn && _pelicula != null) {
+      final videoUrl = (_pelicula!['video'] as String?)?.trim() ?? '';
+      if (videoUrl.isNotEmpty) {
+        _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+        _initializeVideoPlayerFuture = _videoController!.initialize().then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final pelicula = _pelicula;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reproducción'),
+        title: Text(pelicula != null ? pelicula['titulo'] as String : 'Reproducción'),
       ),
       drawer: const AppDrawer(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Reproductor de película',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Aquí puedes ver la película y usar los controles de reproducción.',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 220,
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Stack(
+      body: pelicula == null
+          ? const Center(child: Text('No se encontró la película.'))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Center(
-                    child: Icon(
-                      Icons.play_circle_outline,
-                      color: Colors.white54,
-                      size: 72,
+                  Text(
+                    pelicula['titulo'] as String? ?? 'Película',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 16,
-                    child: Column(
-                      children: const [
-                        LinearProgressIndicator(
-                          value: 0.3,
-                          color: Colors.red,
-                          backgroundColor: Colors.white24,
-                        ),
-                        SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('00:12', style: TextStyle(color: Colors.white70)),
-                            Text('1:45:32', style: TextStyle(color: Colors.white70)),
-                          ],
+                  const SizedBox(height: 8),
+                  Text(
+                    '${pelicula['genero'] ?? ''} • ${pelicula['anio'] ?? ''} • ${pelicula['duracion'] ?? ''}',
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      pelicula['imagen'] as String? ?? '',
+                      height: 220,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 220,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: Icon(Icons.image, size: 64, color: Colors.grey),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_isUserLoggedIn && _videoController != null)
+                    _buildVideoPlayer()
+                  else
+                    _buildLoginNotice(context),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          pelicula['descripcion'] as String? ?? '',
+                          style: const TextStyle(fontSize: 14, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 16),
+                        if (_isUserLoggedIn && _videoController != null)
+                          ElevatedButton.icon(
+                            onPressed: _toggleVideoPlayback,
+                            icon: Icon(_videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow),
+                            label: Text(_videoController!.value.isPlaying ? 'Pausar' : 'Reproducir'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          )
+                        else
+                          const Text(
+                            'Inicia sesión para ver el video de la película.',
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 20),
+                  _detalleFila('Calificación', '${pelicula['calificacion'] ?? '-'}'),
+                  const SizedBox(height: 8),
+                  _detalleFila('Trailer', pelicula['trailer'] as String? ?? ''),
+                  const SizedBox(height: 8),
+                  _detalleFila('Video', pelicula['video'] as String? ?? ''),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _controlButton(Icons.play_arrow, 'Reproducir'),
-                      _controlButton(Icons.pause, 'Pausa'),
-                      _controlButton(Icons.fast_forward, 'Adelantar'),
-                      _controlButton(Icons.fast_rewind, 'Retroceder'),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _optionChip('Subtítulos'),
-                      _optionChip('Calidad'),
-                      _optionChip('Volumen'),
-                    ],
-                  ),
-                ],
-              ),
+    );
+  }
+
+  Widget _buildVideoPlayer() {
+    return FutureBuilder<void>(
+      future: _initializeVideoPlayerFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError || _videoController == null) {
+          return const SizedBox(
+            height: 220,
+            child: Center(child: Text('No se pudo cargar el video.')),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: _videoController!.value.aspectRatio,
+              child: VideoPlayer(_videoController!),
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Ajustes de reproducción',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            VideoProgressIndicator(
+              _videoController!,
+              allowScrubbing: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
             ),
-            const SizedBox(height: 12),
-            _infoRow('Formato', 'HD 1080p'),
-            const SizedBox(height: 8),
-            _infoRow('Subtítulos', 'Español'),
-            const SizedBox(height: 8),
-            _infoRow('Velocidad', 'Normal'),
           ],
-        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoginNotice(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Debes estar registrado para reproducir el video.',
+            style: TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, '/login_screen');
+            },
+            icon: const Icon(Icons.login),
+            label: const Text('Iniciar sesión'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  void _toggleVideoPlayback() {
+    final controller = _videoController;
+    if (controller == null) return;
+
+    setState(() {
+      if (controller.value.isPlaying) {
+        controller.pause();
+      } else {
+        controller.play();
+      }
+    });
+  }
 }
 
-Widget _controlButton(IconData icon, String label) {
-  return Column(
+Widget _detalleFila(String etiqueta, String valor) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          shape: BoxShape.circle,
-        ),
-        child: IconButton(
-          icon: Icon(icon, color: Colors.blue),
-          onPressed: () {},
+      Expanded(
+        flex: 2,
+        child: Text(
+          etiqueta,
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
         ),
       ),
-      const SizedBox(height: 8),
-      Text(label, style: const TextStyle(fontSize: 12)),
-    ],
-  );
-}
-
-Widget _optionChip(String label) {
-  return Chip(
-    label: Text(label),
-    backgroundColor: Colors.grey.shade200,
-  );
-}
-
-Widget _infoRow(String label, String value) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(label, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-      Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      Expanded(
+        flex: 5,
+        child: Text(
+          valor,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
     ],
   );
 }

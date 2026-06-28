@@ -23,20 +23,20 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
-            leading: Icon(Icons.movie),
-            title: Text('Catálogo'),
+            leading: const Icon(Icons.movie),
+            title: const Text('Catálogo'),
             onTap: () {
               Navigator.pushNamed(context, "/catalogo_screen");
             },
           ),
           ListTile(
-            leading: Icon(Icons.play_circle),
-            title: Text('Reproducción'),
+            leading: const Icon(Icons.home),
+            title: const Text('Inicio'),
             onTap: () {
-              Navigator.pushNamed(context, "/reproduccion_screen");
+              Navigator.pushNamed(context, "/");
             },
           ),
-          Divider(),
+          const Divider(),
           ListTile(
             leading: Icon(Icons.logout),
             title: Text('Cerrar Sesión'),

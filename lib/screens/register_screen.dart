@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
+
+final supabase = Supabase.instance.client;
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,16 +16,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
-  final TextEditingController _contrasenaController = TextEditingController();
-
-  @override
-  void dispose() {
-    _nombreController.dispose();
-    _apellidoController.dispose();
-    _correoController.dispose();
-    _contrasenaController.dispose();
-    super.dispose();
-  }
+  final TextEditingController _contraseniaController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +111,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _contrasenaController,
+                    controller: _contraseniaController,
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: 'Contraseña',
@@ -135,18 +130,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: _isLoading ? null : () async {
                       if (_formKey.currentState?.validate() == true) {
-                        Navigator.pushNamed(context, '/login_screen');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Registro exitoso. Inicia sesión.')),
-                        );
+                        await _registerUser();
                       }
                     },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: const Text('REGISTRARSE'),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('REGISTRARSE'),
                   ),
                 ],
               ),
@@ -156,9 +157,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _correoController.dispose();
+    _contraseniaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _registerUser() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final correo = _correoController.text.trim();
+    final contrasenia = _contraseniaController.text;
+
+    try {
+      final AuthResponse res = await supabase.auth.signUp(
+        email: correo,
+        password: contrasenia,
+      );
+
+      if (!mounted) return;
+      if (res.user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registro enviado. Revisa tu correo para la verificación.')),
+        );
+        Navigator.pushNamed(context, '/login_screen');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo registrar al usuario. Intenta de nuevo.')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      String mensaje = 'Error en el registro. Intenta nuevamente.';
+      if (error is AuthException) {
+        mensaje = error.message;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensaje)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 }
 
-void irLogin(BuildContext context){
+void irLogin(BuildContext context) {
   Navigator.pushNamed(context, "/login_screen");
 }
-

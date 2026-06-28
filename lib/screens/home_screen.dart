@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -32,6 +32,11 @@ class HomeScreen extends StatelessWidget {
                   onPressed: () => irLogin(context),
                   child: const Text('Iniciar Sesion'),
                 ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => irCatalogo(context),
+                  child: const Text('Ver Catálogo'),
+                ),
               ],
             ),
           ),
@@ -47,4 +52,8 @@ void irHome(BuildContext context) {
 
 void irLogin(BuildContext context) {
   Navigator.pushNamed(context, "/login_screen");
+}
+
+void irCatalogo(BuildContext context) {
+  Navigator.pushNamed(context, "/catalogo_screen");
 }

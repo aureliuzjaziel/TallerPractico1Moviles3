@@ -1,8 +1,16 @@
+﻿import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
 
 class CatalogoScreen extends StatelessWidget {
   const CatalogoScreen({super.key});
+
+  Future<Map<String, dynamic>> _cargarPeliculas() async {
+    final jsonString = await rootBundle.loadString('assets/data/peliculas.json');
+    return json.decode(jsonString) as Map<String, dynamic>;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,60 +19,64 @@ class CatalogoScreen extends StatelessWidget {
         title: const Text('Catálogo'),
       ),
       drawer: const AppDrawer(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Explora el catálogo',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Películas organizadas por categoría para que elijas tu favorito.',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            _categorySection(
-              title: 'Populares',
-              movies: [
-                {'title': 'Película 1', 'subtitle': 'Acción', 'image': 'assets/images/movie1.jpg'},
-                {'title': 'Película 2', 'subtitle': 'Aventura', 'image': 'assets/images/movie2.jpg'},
-                {'title': 'Película 3', 'subtitle': 'Comedia', 'image': 'assets/images/movie3.jpg'},
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _cargarPeliculas(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar el catálogo: ${snapshot.error}'));
+          }
+
+          final categorias = (snapshot.data?['categorias'] as Map<String, dynamic>?) ?? {};
+          final entries = categorias.entries;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Explora el catálogo',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Películas organizadas por categoría para que elijas tu favorito.',
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+                const SizedBox(height: 16),
+                ...entries.map((entry) {
+                  final category = entry.value as Map<String, dynamic>;
+                  final peliculas = List<Map<String, dynamic>>.from(category['peliculas'] as List<dynamic>);
+                  return Column(
+                    children: [
+                      _categorySection(
+                        context: context,
+                        title: category['nombre'] as String? ?? entry.key,
+                        movies: peliculas,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                }),
               ],
             ),
-            const SizedBox(height: 16),
-            _categorySection(
-              title: 'Tendencias',
-              movies: [
-                {'title': 'Película 4', 'subtitle': 'Drama', 'image': 'assets/images/movie4.jpg'},
-                {'title': 'Película 5', 'subtitle': 'Suspenso', 'image': 'assets/images/movie5.jpg'},
-                {'title': 'Película 6', 'subtitle': 'Romance', 'image': 'assets/images/movie6.jpg'},
-              ],
-            ),
-            const SizedBox(height: 16),
-            _categorySection(
-              title: 'Nuevas llegadas',
-              movies: [
-                {'title': 'Película 7', 'subtitle': 'Ciencia ficción', 'image': 'assets/images/movie7.jpg'},
-                {'title': 'Película 8', 'subtitle': 'Animación', 'image': 'assets/images/movie8.jpg'},
-                {'title': 'Película 9', 'subtitle': 'Documental', 'image': 'assets/images/movie9.jpg'},
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
 Widget _categorySection({
+  required BuildContext context,
   required String title,
-  required List<Map<String, String>> movies,
+  required List<Map<String, dynamic>> movies,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,14 +99,14 @@ Widget _categorySection({
       ),
       const SizedBox(height: 8),
       SizedBox(
-        height: 240,
+        height: 250,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: movies.length,
           separatorBuilder: (context, index) => const SizedBox(width: 12),
           itemBuilder: (context, index) {
             final movie = movies[index];
-            return _movieCard(movie);
+            return _movieCard(context, movie);
           },
         ),
       ),
@@ -102,12 +114,14 @@ Widget _categorySection({
   );
 }
 
-Widget _movieCard(Map<String, String> movie) {
+Widget _movieCard(BuildContext context, Map<String, dynamic> movie) {
   return InkWell(
-    onTap: () {},
+    onTap: () {
+      Navigator.pushNamed(context, '/reproduccion_screen', arguments: movie);
+    },
     borderRadius: BorderRadius.circular(16),
     child: Container(
-      width: 160,
+      width: 180,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -125,8 +139,8 @@ Widget _movieCard(Map<String, String> movie) {
           Expanded(
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.asset(
-                movie['image']!,
+              child: Image.network(
+                movie['imagen'] as String? ?? '',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
@@ -145,7 +159,7 @@ Widget _movieCard(Map<String, String> movie) {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  movie['title']!,
+                  movie['titulo'] as String? ?? 'Título',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -153,13 +167,13 @@ Widget _movieCard(Map<String, String> movie) {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  movie['subtitle']!,
+                  movie['genero'] as String? ?? '',
                   style: const TextStyle(color: Colors.black54, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Descripción breve de la película para ver más detalles.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                Text(
+                  movie['descripcion'] as String? ?? '',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
