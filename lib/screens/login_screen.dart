@@ -1,5 +1,5 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:taller_practico/services/supabase_service.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -137,31 +137,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final AuthResponse res = await Supabase.instance.client.auth.signInWithPassword(
-        email: _correoController.text.trim(),
-        password: _contraseniaController.text,
-      );
+      final res = await SupabaseService.signIn(_correoController.text.trim(), _contraseniaController.text);
 
       if (!mounted) return;
       if (res.session != null && res.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inicio de sesión exitoso.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inicio de sesión exitoso.')));
         Navigator.pushNamed(context, '/');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo iniciar sesión. Revisa tus datos.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo iniciar sesión. Revisa tus datos.')));
       }
     } catch (error) {
       if (!mounted) return;
-      String message = 'Error al iniciar sesión. Intenta de nuevo.';
-      if (error is AuthException) {
-        message = error.message;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      final message = error.toString();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {

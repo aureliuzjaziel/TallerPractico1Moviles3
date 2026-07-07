@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:taller_practico/services/supabase_service.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
-
-final supabase = Supabase.instance.client;
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -176,31 +174,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final contrasenia = _contraseniaController.text;
 
     try {
-      final AuthResponse res = await supabase.auth.signUp(
-        email: correo,
-        password: contrasenia,
-      );
+      final res = await SupabaseService.signUp(correo, contrasenia);
 
       if (!mounted) return;
       if (res.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro enviado. Revisa tu correo para la verificación.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registro enviado. Revisa tu correo para la verificación.')));
         Navigator.pushNamed(context, '/login_screen');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo registrar al usuario. Intenta de nuevo.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo registrar al usuario. Intenta de nuevo.')));
       }
     } catch (error) {
       if (!mounted) return;
-      String mensaje = 'Error en el registro. Intenta nuevamente.';
-      if (error is AuthException) {
-        mensaje = error.message;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensaje)),
-      );
+      final mensaje = error.toString();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
     } finally {
       if (mounted) {
         setState(() {

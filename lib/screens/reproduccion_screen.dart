@@ -1,5 +1,5 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:taller_practico/services/supabase_service.dart';
 import 'package:taller_practico/navigations/buttom_navigation.dart';
 import 'package:video_player/video_player.dart';
 
@@ -15,24 +15,17 @@ class _ReproduccionScreenState extends State<ReproduccionScreen> {
   Future<void>? _initializeVideoPlayerFuture;
   Map<String, dynamic>? _pelicula;
 
-  bool get _isUserLoggedIn => Supabase.instance.client.auth.currentUser != null;
+  bool get _isUserLoggedIn => SupabaseService.isLoggedIn();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_pelicula != null) return;
 
+    // Guardamos sólo la película en el estado. No inicializamos el
+    // controlador hasta que el usuario intente reproducir, para evitar
+    // que el video se cargue sin permiso.
     _pelicula = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-
-    if (_isUserLoggedIn && _pelicula != null) {
-      final videoUrl = (_pelicula!['video'] as String?)?.trim() ?? '';
-      if (videoUrl.isNotEmpty) {
-        _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-        _initializeVideoPlayerFuture = _videoController!.initialize().then((_) {
-          if (mounted) setState(() {});
-        });
-      }
-    }
   }
 
   @override
@@ -87,8 +80,19 @@ class _ReproduccionScreenState extends State<ReproduccionScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  if (_isUserLoggedIn && _videoController != null)
+                  if (_videoController != null)
                     _buildVideoPlayer()
+                  else if (_isUserLoggedIn)
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _handlePlayPressed,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Reproducir'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                        ),
+                      ),
+                    )
                   else
                     _buildLoginNotice(context),
                   const SizedBox(height: 20),
@@ -113,11 +117,13 @@ class _ReproduccionScreenState extends State<ReproduccionScreen> {
                           style: const TextStyle(fontSize: 14, color: Colors.black87),
                         ),
                         const SizedBox(height: 16),
-                        if (_isUserLoggedIn && _videoController != null)
+                        if (_isUserLoggedIn)
                           ElevatedButton.icon(
-                            onPressed: _toggleVideoPlayback,
-                            icon: Icon(_videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow),
-                            label: Text(_videoController!.value.isPlaying ? 'Pausar' : 'Reproducir'),
+                            onPressed: _handlePlayPressed,
+                            icon: Icon(
+                              (_videoController?.value.isPlaying ?? false) ? Icons.pause : Icons.play_arrow,
+                            ),
+                            label: Text((_videoController?.value.isPlaying ?? false) ? 'Pausar' : 'Reproducir'),
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -206,7 +212,28 @@ class _ReproduccionScreenState extends State<ReproduccionScreen> {
     );
   }
 
-  void _toggleVideoPlayback() {
+  // Reproducción controlada por `_handlePlayPressed`.
+
+  Future<void> _initControllerIfNeeded() async {
+    if (!_isUserLoggedIn) return;
+    if (_videoController != null) return;
+    final videoUrl = (_pelicula?['video'] as String?)?.trim() ?? '';
+    if (videoUrl.isEmpty) return;
+
+    _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+    _initializeVideoPlayerFuture = _videoController!.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _handlePlayPressed() async {
+    // Verificamos sesión justo antes de reproducir.
+    if (!_isUserLoggedIn) {
+      Navigator.pushNamed(context, '/login_screen');
+      return;
+    }
+
+    await _initControllerIfNeeded();
     final controller = _videoController;
     if (controller == null) return;
 
