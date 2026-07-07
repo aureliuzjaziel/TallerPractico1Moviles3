@@ -1,41 +1,80 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:taller_practico/screens/catalogo_screen.dart';
 import 'package:taller_practico/screens/home_screen.dart';
 import 'package:taller_practico/screens/login_screen.dart';
 import 'package:taller_practico/screens/register_screen.dart';
+import 'package:taller_practico/screens/catalogo_screen.dart';
 import 'package:taller_practico/screens/reproduccion_screen.dart';
+import 'package:taller_practico/screens/pantalla_protegida.dart';
 
 Future<void> main() async {
-  
+  WidgetsFlutterBinding.ensureInitialized();
+
   await Supabase.initialize(
     url: 'https://kylrypfmbklnbfgdwedh.supabase.co',
-    publishableKey: 'sb_publishable_5cUpJo3yPx5bTLUK5V4Y7A_amGYp2CT',
+    anonKey: 'sb_publishable_5cUpJo3yPx5bTLUK5V4Y7A_amGYp2CT',
   );
 
-runApp(MiAplicacion());
-
+  runApp(const MiAplicacion());
 }
-final supabase = Supabase.instance.client;
 
-
- class MiAplicacion extends StatelessWidget {
+class MiAplicacion extends StatelessWidget {
   const MiAplicacion({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return  MaterialApp(
-      initialRoute: "/",
+    return MaterialApp(
+      title: 'Stream Movie',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const AuthGate(),
       routes: {
-        "/":(context) => HomeScreen(),
-        "/login_screen":(context) => LoginScreen(),
-        "/register_screen":(context) => RegisterScreen(),
-        "/catalogo_screen":(context) => CatalogoScreen(),
-        "/reproduccion_screen":(context) => ReproduccionScreen()
-        
-        
+        '/home': (context) => const HomeScreen(),
+        '/login_screen': (context) => const LoginScreen(),
+        '/register_screen': (context) => const RegisterScreen(),
+        '/catalogo_screen': (context) =>
+            const PantallaProtegida(child: CatalogoScreen()),
+        '/reproduccion_screen': (context) =>
+            const PantallaProtegida(child: ReproduccionScreen()),
       },
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  Session? _currentSession;
+  late final StreamSubscription<AuthState> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSession = Supabase.instance.client.auth.currentSession;
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      setState(() {
+        _currentSession = event.session;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    return const HomeScreen();
   }
 }
 

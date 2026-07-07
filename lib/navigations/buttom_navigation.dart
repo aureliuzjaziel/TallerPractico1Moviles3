@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
+
+  bool get _isUserLoggedIn => Supabase.instance.client.auth.currentSession != null;
 
   @override
   Widget build(BuildContext context) {
@@ -9,10 +12,8 @@ class AppDrawer extends StatelessWidget {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.blue,
-            ),
+          const DrawerHeader(
+            decoration: BoxDecoration(color: Colors.blue),
             child: Text(
               'Stream Movie',
               style: TextStyle(
@@ -26,22 +27,29 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.movie),
             title: const Text('Catálogo'),
             onTap: () {
-              Navigator.pushNamed(context, "/catalogo_screen");
+              if (_isUserLoggedIn) {
+                Navigator.pushNamed(context, "/catalogo_screen");
+              } else {
+                Navigator.pushNamed(context, "/login_screen");
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.home),
             title: const Text('Inicio'),
-            onTap: () {
-              Navigator.pushNamed(context, "/");
-            },
+            onTap: () => Navigator.pushNamed(context, "/home"),
           ),
           const Divider(),
           ListTile(
-            leading: Icon(Icons.logout),
-            title: Text('Cerrar Sesión'),
-            onTap: () {
-              Navigator.pushNamed(context, "/");
+            leading: const Icon(Icons.logout),
+            title: const Text('Cerrar Sesión'),
+            onTap: () async {
+              await Supabase.instance.client.auth.signOut();
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                "/login_screen",
+                (route) => false,
+              );
             },
           ),
         ],
